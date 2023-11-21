@@ -3,6 +3,7 @@ package ext4
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"io"
 	"io/fs"
 	"path"
@@ -104,6 +105,15 @@ func (ext4 *FileSystem) readDirEntry(name string) ([]fs.DirEntry, error) {
 		return nil, xerrors.Errorf("failed to list file infos: %w", err)
 	}
 
+	fmt.Printf("readDirEntry root (%s):", name)
+	for i, fileInfo := range fileInfos {
+		if i > 0 {
+			fmt.Printf(" ")
+		}
+		fmt.Printf("%s", fileInfo.Name())
+	}
+	fmt.Println()
+
 	var currentIno int64
 	dirs := strings.Split(strings.Trim(filepath.Clean(name), "/"), "/")
 	if len(dirs) == 1 && dirs[0] == "." || dirs[0] == "" {
@@ -138,6 +148,16 @@ func (ext4 *FileSystem) readDirEntry(name string) ([]fs.DirEntry, error) {
 		if err != nil {
 			return nil, xerrors.Errorf("failed to list directory entries inode(%d): %w", currentIno, err)
 		}
+
+		fmt.Printf("readDirEntry %s: ", dir)
+		for i, fileInfo := range fileInfos {
+			if i > 0 {
+				fmt.Printf(" ")
+			}
+			fmt.Printf("%s", fileInfo.Name())
+		}
+		fmt.Println()
+
 		if i != len(dirs)-1 {
 			continue
 		}
@@ -191,6 +211,8 @@ func (ext4 *FileSystem) listEntries(ino int64) ([]DirectoryEntry2, error) {
 		return nil, xerrors.Errorf("failed to get extents: %w", err)
 	}
 
+	k := false
+
 	var entries []DirectoryEntry2
 	for _, e := range extents {
 		_, err := ext4.r.Seek(e.offset()*ext4.sb.GetBlockSize(), 0)
@@ -220,10 +242,15 @@ func (ext4 *FileSystem) listEntries(ino int64) ([]DirectoryEntry2, error) {
 				continue
 			}
 			if dirEntry.Flags == 0xDE {
+				k = true
+				fmt.Printf("listEntries: %s %d\n", dirEntry.Name, len(entries))
 				continue
 			}
 			entries = append(entries, dirEntry)
 		}
+	}
+	if k {
+		fmt.Printf("listEntries: %d\n", len(entries))
 	}
 	return entries, nil
 }
